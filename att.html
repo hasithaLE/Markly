@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance App</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js';
+        import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        
+        // Firebase configuration (Replace with YOUR actual config from Firebase Console)
+        const firebaseConfig = {
+                apiKey: "AIzaSyAB8uJxZ6FmzwSAKh78J9pLZRMSIy3sp6Q",
+                authDomain: "attendance-app-94af0.firebaseapp.com",
+                projectId: "attendance-app-94af0",
+                storageBucket: "attendance-app-94af0.firebasestorage.app",
+                messagingSenderId: "388452253022",
+                appId: "1:388452253022:web:dcc83a85267995194863cf"
+            };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Make Firebase functions available globally
+        window.db = db;
+        window.firestore = { collection, doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, onSnapshot };
+    </script>
+    
+    <style>
+        /* Desktop container styling */
+        html {
+            background-color: #e5e7eb;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+        
+        body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f8fafc;
+        color: #334155;
+        -webkit-tap-highlight-color: transparent;
+        /* Mobile-first design - limit width on desktop */
+        max-width: 430px;
+        width: 100%;
+        margin: 0;
+        position: relative;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        min-height: 100vh;
+    }
+    
+    /* Ensure mobile viewport behavior */
+    @media (max-width: 430px) {
+        html {
+            background-color: #f8fafc;
+            display: block;
+            justify-content: unset;
+        }
+        
+        body {
+            max-width: 100%;
+            box-shadow: none;
+            margin: 0;
+        }
+    }
+    
+    .screen {
+        display: none;
+        min-height: 100vh;
+        padding-bottom: 80px; /* Space for bottom nav */
+        width: 100%;
+    }
+    
+    /* Modal positioning for mobile-first design */
+    .modal-container {
+        max-width: 430px;
+        margin: 0 auto;
+        position: relative;
+    }
+    
+    /* Mobile-first modal overlay */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100%;
+        max-width: 430px;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    @media (max-width: 430px) {
+        .modal-overlay {
+            left: 0;
+            transform: none;
+            max-width: 100%;
+        }
+    }
+    
+    /* Fixed elements should respect mobile width */
+    .fixed {
+        max-width: 430px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    
+    @media (max-width: 430px) {
+        .fixed {
+            left: 0;
+            transform: none;
+            max-width: 100%;
+        }
+    }
+    
+    .screen.active {
+        display: block;
+    }
+    
+    .nav-item.active {
+        color: #3b82f6;
+    }
+    
+    .nav-item.active i {
+        color: #3b82f6;
+    }
+    
+    .card {
+        background-color: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+    }
+    
+    .card:active {
+        transform: scale(0.98);
+    }
+    
+    .btn {
+        transition: all 0.2s ease;
+    }
+    
+    .btn:active {
+        transform: scale(0.97);
+    }
+    
+    /* Custom radio buttons for attendance */
+    .attendance-option input[type="radio"] {
+        display: none;
+    }
+    
+    .attendance-option label {
+        display: block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid #e2e8f0;
+        background-color: white;
+    }
+    
+    .attendance-option input[type="radio"]:checked + label.present {
+        background-color: #10b981;
+        color: white;
+        border-color: #10b981;
+    }
+    
+    .attendance-option input[type="radio"]:checked + label.absent {
+        background-color: #ef4444;
+        color: white;
+        border-color: #ef4444;
+    }
+    
+    .attendance-option input[type="radio"]:checked + label.late {
+        background-color: #f59e0b;
+        color: white;
+        border-color: #f59e0b;
+    }
+    
+    .attendance-option input[type="radio"]:checked + label.excused {
+        background-color: #6366f1;
+        color: white;
+        border-color: #6366f1;
+    }
+    
+    /* Calendar styling */
+    .calendar {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 4px;
+    }
+    
+    .calendar-day {
+        aspect-ratio: 1/1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 12px;
+    }
+    
+    .calendar-day.present {
+        background-color: rgba(16, 185, 129, 0.2);
+    }
+    
+    .calendar-day.absent {
+        background-color: rgba(239, 68, 68, 0.2);
+    }
+    
+    .calendar-day.late {
+        background-color: rgba(245, 158, 11, 0.2);
+    }
+    
+    .calendar-day.excused {
+        background-color: rgba(99, 102, 241, 0.2);
+    }
+    
+    /* Animations */
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-in-out;
+    }
+    
+    .slide-up {
+        transform: translateY(20px);
+        opacity: 0;
+        transition: all 0.3s ease;
+    }
+    
+    .slide-up.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    </style>
+</head>
+<body>
+    <!-- Welcome Screen -->
+    <div id="welcome-screen" class="screen active animate-fade-in">
+        <div class="flex flex-col items-center justify-center min-h-screen px-6 py-8">
+            <div class="text-center mb-8">
+                <div class="w-24 h-24 mx-auto mb-6 rounded-full bg-blue-100 flex items-center justify-center">
+                    <i class="fas fa-clipboard-check text-3xl text-blue-500"></i>
+                </div>
+                <h1 class="text-3xl font-bold mb-4 text-gray-800">Welcome to</h1>
+                <h2 class="text-2xl font-bold mb-6 text-blue-600">Attendance App</h2>
+                <p class="text-gray-600 mb-8 max-w-sm mx-auto">
+                    Manage your class attendance easily and efficiently. Track student presence, generate reports, and stay organized.
+                </p>
+            </div>
+            <button id="create-profile-btn" class="btn bg-blue-500 hover:bg-blue-600 text-white py-4 px-8 rounded-full font-medium shadow-lg w-full max-w-sm transition-all duration-200">
+                Create Teacher Profile
+            </button>
+        </div>
+    </div>
+
+    <!-- Teacher Profile Creation -->
+    <div id="profile-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <h1 class="text-2xl font-bold mb-6">Create Your Profile</h1>
+            <form id="profile-form">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="fullName">Full Name*</label>
+                    <input type="text" id="fullName" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="phoneNumber">Phone Number*</label>
+                    <input type="tel" id="phoneNumber" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="email">Email (optional)</label>
+                    <input type="email" id="email" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="mb-8">
+                    <label class="block text-sm font-medium mb-2" for="institute">Institute Name (optional)</label>
+                    <input type="text" id="institute" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <button type="submit" class="btn bg-blue-500 text-white py-3 px-8 rounded-full font-medium shadow-lg w-full">
+                    Save Profile
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Dashboard/Main Menu -->
+    <div id="dashboard-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold">Dashboard</h1>
+                    <p class="text-gray-500" id="teacher-name">Welcome, Teacher</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-blue-500"></i>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="card p-5 slide-up show" style="transition-delay: 0.1s" id="go-to-classes">
+                    <div class="w-12 h-12 mb-3 rounded-full bg-green-100 flex items-center justify-center">
+                        <i class="fas fa-chalkboard text-green-500"></i>
+                    </div>
+                    <h3 class="font-medium">Manage Classes</h3>
+                    <p class="text-xs text-gray-500 mt-1">Create and edit classes</p>
+                </div>
+                <div class="card p-5 slide-up show" style="transition-delay: 0.2s" id="go-to-attendance">
+                    <div class="w-12 h-12 mb-3 rounded-full bg-blue-100 flex items-center justify-center">
+                        <i class="fas fa-clipboard-check text-blue-500"></i>
+                    </div>
+                    <h3 class="font-medium">Mark Attendance</h3>
+                    <p class="text-xs text-gray-500 mt-1">Record daily attendance</p>
+                </div>
+                <div class="card p-5 slide-up show" style="transition-delay: 0.3s" id="go-to-summary">
+                    <div class="w-12 h-12 mb-3 rounded-full bg-purple-100 flex items-center justify-center">
+                        <i class="fas fa-chart-pie text-purple-500"></i>
+                    </div>
+                    <h3 class="font-medium">View Summary</h3>
+                    <p class="text-xs text-gray-500 mt-1">Attendance statistics</p>
+                </div>
+                <div class="card p-5 slide-up show" style="transition-delay: 0.4s" id="go-to-export">
+                    <div class="w-12 h-12 mb-3 rounded-full bg-orange-100 flex items-center justify-center">
+                        <i class="fas fa-file-export text-orange-500"></i>
+                    </div>
+                    <h3 class="font-medium">Export Data</h3>
+                    <p class="text-xs text-gray-500 mt-1">Download reports</p>
+                </div>
+            </div>
+            
+            <div class="card p-5 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-medium">Recent Activity</h3>
+                    <span class="text-xs text-blue-500">View All</span>
+                </div>
+                <div class="space-y-4" id="recent-activity">
+                    <p class="text-sm text-gray-500 text-center py-4">No recent activity</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Class Management Screen -->
+    <div id="classes-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <h1 class="text-2xl font-bold mb-6">Manage Classes</h1>
+            
+            <button id="add-class-btn" class="btn bg-blue-500 text-white py-3 px-6 rounded-full font-medium shadow-lg w-full mb-6 flex items-center justify-center">
+                <i class="fas fa-plus mr-2"></i> Create New Class
+            </button>
+            
+            <div id="classes-list" class="space-y-4">
+                <!-- Classes will be added here dynamically -->
+                <p class="text-gray-500 text-center py-4" id="no-classes-message">No classes created yet</p>
+            </div>
+        </div>
+        
+        <!-- Add/Edit Class Modal -->
+        <div id="class-modal" class="modal-overlay hidden">
+            <div class="bg-white rounded-lg w-full max-w-md mx-4 animate-fade-in">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold" id="class-modal-title">Add New Class</h3>
+                        <button class="text-gray-500 hover:text-gray-700" id="close-class-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <form id="class-form">
+                        <input type="hidden" id="class-id">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="className">Class Name*</label>
+                            <input type="text" id="className" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="grade">Grade/Year*</label>
+                            <input type="text" id="grade" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="subject">Subject*</label>
+                            <input type="text" id="subject" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium mb-2" for="startDate">Start Date*</label>
+                            <input type="date" id="startDate" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button type="submit" class="btn bg-blue-500 text-white py-3 px-6 rounded-lg font-medium flex-1">Save Class</button>
+                            <button type="button" id="delete-class-btn" class="btn bg-white border border-red-500 text-red-500 py-3 px-4 rounded-lg font-medium hidden">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Management Screen -->
+    <div id="students-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <div class="flex items-center mb-6">
+                <button id="back-to-classes" class="mr-3">
+                    <i class="fas fa-arrow-left text-blue-500"></i>
+                </button>
+                <div>
+                    <h1 class="text-2xl font-bold" id="class-name-header">Class Name</h1>
+                    <p class="text-gray-500 text-sm" id="class-details">Grade • Subject</p>
+                </div>
+            </div>
+            
+            <button id="add-student-btn" class="btn bg-blue-500 text-white py-3 px-6 rounded-full font-medium shadow-lg w-full mb-6 flex items-center justify-center">
+                <i class="fas fa-plus mr-2"></i> Add New Student
+            </button>
+            
+            <div id="students-list" class="space-y-4">
+                <!-- Students will be added here dynamically -->
+                <p class="text-gray-500 text-center py-4" id="no-students-message">No students added yet</p>
+            </div>
+        </div>
+        
+        <!-- Add/Edit Student Modal -->
+        <div id="student-modal" class="modal-overlay hidden">
+            <div class="bg-white rounded-lg w-full max-w-md mx-4 animate-fade-in">
+                <div class="p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-bold" id="student-modal-title">Add New Student</h3>
+                        <button class="text-gray-500 hover:text-gray-700" id="close-student-modal">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <form id="student-form">
+                        <input type="hidden" id="student-id">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="studentName">Student Name*</label>
+                            <input type="text" id="studentName" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="studentId">Student ID*</label>
+                            <input type="text" id="studentId" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2" for="contactNumber">Contact Number*</label>
+                            <input type="tel" id="contactNumber" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium mb-2" for="guardianName">Guardian Name (optional)</label>
+                            <input type="text" id="guardianName" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div class="flex space-x-3">
+                            <button type="submit" class="btn bg-blue-500 text-white py-3 px-6 rounded-lg font-medium flex-1">Save Student</button>
+                            <button type="button" id="delete-student-btn" class="btn bg-white border border-red-500 text-red-500 py-3 px-4 rounded-lg font-medium hidden">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Marking Screen -->
+    <div id="attendance-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <h1 class="text-2xl font-bold mb-6">Mark Attendance</h1>
+            
+            <div class="card p-5 mb-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="attendance-class">Select Class</label>
+                    <select id="attendance-class" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select a class</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="attendance-date">Select Date</label>
+                    <input type="date" id="attendance-date" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500" value="">
+                </div>
+            </div>
+            
+            <div id="attendance-controls" class="mb-6 hidden">
+                <button id="mark-all-present" class="btn bg-green-500 text-white py-2 px-4 rounded-lg font-medium text-sm mb-4">
+                    <i class="fas fa-check-double mr-2"></i> Mark All Present
+                </button>
+                
+                <div class="flex justify-between text-xs text-gray-500 px-2 mb-2">
+                    <span>Student</span>
+                    <span>Status</span>
+                </div>
+            </div>
+            
+            <div id="attendance-list" class="space-y-4">
+                <!-- Attendance items will be added here dynamically -->
+                <p class="text-gray-500 text-center py-4" id="no-attendance-message">Select a class to mark attendance</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attendance Summary Screen -->
+    <div id="summary-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <h1 class="text-2xl font-bold mb-6">Attendance Summary</h1>
+            
+            <div class="card p-5 mb-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="summary-class">Select Class</label>
+                    <select id="summary-class" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select a class</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="summary-student">Select Student (Optional)</label>
+                    <select id="summary-student" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Students</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="summary-start-date">Start Date</label>
+                        <input type="date" id="summary-start-date" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="summary-end-date">End Date</label>
+                        <input type="date" id="summary-end-date" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-6 hidden" id="summary-stats">
+                <h3 class="font-medium mb-3">Attendance Statistics</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="card p-4 bg-green-50">
+                        <p class="text-xs text-gray-500">Present</p>
+                        <p class="text-xl font-bold text-green-600" id="present-count">0</p>
+                    </div>
+                    <div class="card p-4 bg-red-50">
+                        <p class="text-xs text-gray-500">Absent</p>
+                        <p class="text-xl font-bold text-red-600" id="absent-count">0</p>
+                    </div>
+                    <div class="card p-4 bg-yellow-50">
+                        <p class="text-xs text-gray-500">Late</p>
+                        <p class="text-xl font-bold text-yellow-600" id="late-count">0</p>
+                    </div>
+                    <div class="card p-4 bg-indigo-50">
+                        <p class="text-xs text-gray-500">Excused</p>
+                        <p class="text-xl font-bold text-indigo-600" id="excused-count">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-6 hidden" id="calendar-view">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-medium">Calendar View</h3>
+                    <div class="text-sm">
+                        <span id="calendar-month">Month</span>
+                    </div>
+                </div>
+                <div class="calendar mb-2">
+                    <div class="text-xs text-center font-medium text-gray-500">S</div>
+                    <div class="text-xs text-center font-medium text-gray-500">M</div>
+                    <div class="text-xs text-center font-medium text-gray-500">T</div>
+                    <div class="text-xs text-center font-medium text-gray-500">W</div>
+                    <div class="text-xs text-center font-medium text-gray-500">T</div>
+                    <div class="text-xs text-center font-medium text-gray-500">F</div>
+                    <div class="text-xs text-center font-medium text-gray-500">S</div>
+                    <!-- Calendar days will be added here dynamically -->
+                </div>
+                <div class="flex justify-center space-x-4 text-xs">
+                    <div class="flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-green-200 mr-1"></span>
+                        <span>Present</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-red-200 mr-1"></span>
+                        <span>Absent</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-3 h-3 rounded-full bg-yellow-200 mr-1"></span>
+                        <span>Late</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="student-summary-list" class="space-y-4">
+                <!-- Student summary items will be added here dynamically -->
+                <p class="text-gray-500 text-center py-4" id="no-summary-message">Select a class to view summary</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Screen -->
+    <div id="export-screen" class="screen animate-fade-in">
+        <div class="px-6 py-8">
+            <h1 class="text-2xl font-bold mb-6">Export Data</h1>
+            
+            <div class="card p-5 mb-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="export-class">Select Class</label>
+                    <select id="export-class" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select a class</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2" for="export-student">Select Student (Optional)</label>
+                    <select id="export-student" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">All Students</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="export-start-date">Start Date</label>
+                        <input type="date" id="export-start-date" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2" for="export-end-date">End Date</label>
+                        <input type="date" id="export-end-date" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm font-medium mb-2">Export Format</label>
+                    <div class="flex space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" name="export-format" value="csv" checked class="mr-2">
+                            <span>CSV</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="export-format" value="pdf" class="mr-2">
+                            <span>PDF</span>
+                        </label>
+                    </div>
+                </div>
+                <button id="export-btn" class="btn bg-blue-500 text-white py-3 px-6 rounded-lg font-medium w-full flex items-center justify-center">
+                    <i class="fas fa-download mr-2"></i> Export Data
+                </button>
+            </div>
+            
+            <div class="card p-5">
+                <h3 class="font-medium mb-4">Previous Exports</h3>
+                <div id="exports-list" class="space-y-3">
+                    <p class="text-gray-500 text-center py-2" id="no-exports-message">No previous exports</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="fixed bottom-0 bg-white border-t border-gray-200 flex justify-around items-center h-16 z-40 w-full max-w-[430px] left-1/2 transform -translate-x-1/2">
+        <div class="nav-item active flex flex-col items-center" data-screen="dashboard-screen">
+            <i class="fas fa-home text-lg"></i>
+            <span class="text-xs mt-1">Home</span>
+        </div>
+        <div class="nav-item flex flex-col items-center" data-screen="classes-screen">
+            <i class="fas fa-chalkboard text-lg"></i>
+            <span class="text-xs mt-1">Classes</span>
+        </div>
+        <div class="nav-item flex flex-col items-center" data-screen="attendance-screen">
+            <i class="fas fa-clipboard-check text-lg"></i>
+            <span class="text-xs mt-1">Attendance</span>
+        </div>
+        <div class="nav-item flex flex-col items-center" data-screen="summary-screen">
+            <i class="fas fa-chart-pie text-lg"></i>
+            <span class="text-xs mt-1">Summary</span>
+        </div>
+    </div>
+    <script>
+    // Initialize app data
+    const appData = {
+        teacher: null,
+        classes: [],
+        students: {},
+        attendance: {},
+        currentClassId: null,
+        currentStudentId: null,
+        exports: []
+    };
+
+    // Helper functions
+    function generateId() {
+        return Math.random().toString(36).substring(2, 15);
+    }
+
+    function formatDate(date) {
+        const d = new Date(date);
+        return d.toLocaleDateString();
+    }
+
+    function getCurrentDate() {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    // Firebase utility functions
+    async function saveTeacher(teacherData) {
+        try {
+            await window.firestore.setDoc(window.firestore.doc(window.db, 'teachers', 'current'), teacherData);
+            console.log('Teacher data saved successfully');
+        } catch (error) {
+            console.error('Error saving teacher data:', error);
+        }
+    }
+
+    async function loadTeacher() {
+        try {
+            const docSnap = await window.firestore.getDoc(window.firestore.doc(window.db, 'teachers', 'current'));
+            if (docSnap.exists()) {
+                return docSnap.data();
+            }
+            return null;
+        } catch (error) {
+            console.error('Error loading teacher data:', error);
+            return null;
+        }
+    }
+
+    async function saveClass(classData) {
+        try {
+            await window.firestore.setDoc(window.firestore.doc(window.db, 'classes', classData.id), classData);
+            console.log('Class saved successfully');
+        } catch (error) {
+            console.error('Error saving class:', error);
+        }
+    }
+
+    async function loadClasses() {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'classes'));
+            const classes = [];
+            querySnapshot.forEach((doc) => {
+                classes.push({ id: doc.id, ...doc.data() });
+            });
+            return classes;
+        } catch (error) {
+            console.error('Error loading classes:', error);
+            return [];
+        }
+    }
+
+    async function deleteClass(classId) {
+        try {
+            await window.firestore.deleteDoc(window.firestore.doc(window.db, 'classes', classId));
+            // Also delete all students and attendance for this class
+            await deleteStudentsForClass(classId);
+            await deleteAttendanceForClass(classId);
+            console.log('Class deleted successfully');
+        } catch (error) {
+            console.error('Error deleting class:', error);
+        }
+    }
+
+    async function saveStudent(classId, studentData) {
+        try {
+            await window.firestore.setDoc(
+                window.firestore.doc(window.db, 'students', `${classId}_${studentData.id}`), 
+                { ...studentData, classId }
+            );
+            console.log('Student saved successfully');
+        } catch (error) {
+            console.error('Error saving student:', error);
+        }
+    }
+
+    async function loadStudentsForClass(classId) {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'students'));
+            const students = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.classId === classId) {
+                    students.push(data);
+                }
+            });
+            return students;
+        } catch (error) {
+            console.error('Error loading students:', error);
+            return [];
+        }
+    }
+
+    async function deleteStudent(classId, studentId) {
+        try {
+            await window.firestore.deleteDoc(window.firestore.doc(window.db, 'students', `${classId}_${studentId}`));
+            // Also delete attendance records for this student
+            await deleteAttendanceForStudent(classId, studentId);
+            console.log('Student deleted successfully');
+        } catch (error) {
+            console.error('Error deleting student:', error);
+        }
+    }
+
+    async function deleteStudentsForClass(classId) {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'students'));
+            const deletePromises = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.classId === classId) {
+                    deletePromises.push(window.firestore.deleteDoc(doc.ref));
+                }
+            });
+            await Promise.all(deletePromises);
+        } catch (error) {
+            console.error('Error deleting students for class:', error);
+        }
+    }
+
+    async function saveAttendance(date, classId, attendanceRecords) {
+        try {
+            await window.firestore.setDoc(
+                window.firestore.doc(window.db, 'attendance', `${date}_${classId}`),
+                {
+                    date,
+                    classId,
+                    records: attendanceRecords
+                }
+            );
+            console.log('Attendance saved successfully');
+        } catch (error) {
+            console.error('Error saving attendance:', error);
+        }
+    }
+
+    async function loadAttendance(date, classId) {
+        try {
+            const docSnap = await window.firestore.getDoc(
+                window.firestore.doc(window.db, 'attendance', `${date}_${classId}`)
+            );
+            if (docSnap.exists()) {
+                return docSnap.data().records;
+            }
+            return [];
+        } catch (error) {
+            console.error('Error loading attendance:', error);
+            return [];
+        }
+    }
+
+    async function loadAllAttendance() {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'attendance'));
+            const attendance = {};
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (!attendance[data.date]) {
+                    attendance[data.date] = {};
+                }
+                attendance[data.date][data.classId] = data.records;
+            });
+            return attendance;
+        } catch (error) {
+            console.error('Error loading all attendance:', error);
+            return {};
+        }
+    }
+
+    async function deleteAttendanceForClass(classId) {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'attendance'));
+            const deletePromises = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.classId === classId) {
+                    deletePromises.push(window.firestore.deleteDoc(doc.ref));
+                }
+            });
+            await Promise.all(deletePromises);
+        } catch (error) {
+            console.error('Error deleting attendance for class:', error);
+        }
+    }
+
+    async function deleteAttendanceForStudent(classId, studentId) {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'attendance'));
+            const updatePromises = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.classId === classId) {
+                    const updatedRecords = data.records.filter(record => record.studentId !== studentId);
+                    updatePromises.push(
+                        window.firestore.updateDoc(doc.ref, { records: updatedRecords })
+                    );
+                }
+            });
+            await Promise.all(updatePromises);
+        } catch (error) {
+            console.error('Error deleting attendance for student:', error);
+        }
+    }
+
+    async function saveExport(exportData) {
+        try {
+            await window.firestore.setDoc(
+                window.firestore.doc(window.db, 'exports', exportData.id),
+                exportData
+            );
+            console.log('Export saved successfully');
+        } catch (error) {
+            console.error('Error saving export:', error);
+        }
+    }
+
+    async function loadExports() {
+        try {
+            const querySnapshot = await window.firestore.getDocs(window.firestore.collection(window.db, 'exports'));
+            const exports = [];
+            querySnapshot.forEach((doc) => {
+                exports.push({ id: doc.id, ...doc.data() });
+            });
+            // Sort by date (newest first)
+            exports.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return exports.slice(0, 10); // Keep only last 10
+        } catch (error) {
+            console.error('Error loading exports:', error);
+            return [];
+        }
+    }
+
+    // Set today's date as default for date inputs
+    document.getElementById('attendance-date').value = getCurrentDate();
+    document.getElementById('summary-start-date').value = getCurrentDate();
+    document.getElementById('summary-end-date').value = getCurrentDate();
+    document.getElementById('export-start-date').value = getCurrentDate();
+    document.getElementById('export-end-date').value = getCurrentDate();
+
+    // Screen navigation
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(screen => {
+            screen.classList.remove('active');
+        });
+        document.getElementById(screenId).classList.add('active');
+        
+        // Update bottom nav
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.screen === screenId) {
+                item.classList.add('active');
+            }
+        });
+    }
+
+    // Bottom navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            showScreen(item.dataset.screen);
+        });
+    });
+
+    // Welcome screen
+    document.getElementById('create-profile-btn').addEventListener('click', () => {
+        showScreen('profile-screen');
+    });
+
+    // Profile creation
+    document.getElementById('profile-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const teacherData = {
+            name: document.getElementById('fullName').value,
+            phone: document.getElementById('phoneNumber').value,
+            email: document.getElementById('email').value,
+            institute: document.getElementById('institute').value
+        };
+        
+        appData.teacher = teacherData;
+        
+        // Update teacher name in dashboard
+        document.getElementById('teacher-name').textContent = `Welcome, ${teacherData.name}`;
+        
+        // Save to Firebase
+        await saveTeacher(teacherData);
+        
+        showScreen('dashboard-screen');
+    });
+
+    // Dashboard navigation
+    document.getElementById('go-to-classes').addEventListener('click', () => {
+        showScreen('classes-screen');
+    });
+    
+    document.getElementById('go-to-attendance').addEventListener('click', () => {
+        showScreen('attendance-screen');
+        populateClassDropdowns();
+    });
+    
+    document.getElementById('go-to-summary').addEventListener('click', () => {
+        showScreen('summary-screen');
+        populateClassDropdowns();
+    });
+    
+    document.getElementById('go-to-export').addEventListener('click', () => {
+        showScreen('export-screen');
+        populateClassDropdowns();
+    });
+
+    // Class Management
+    document.getElementById('add-class-btn').addEventListener('click', () => {
+        // Reset form for new class
+        document.getElementById('class-form').reset();
+        document.getElementById('class-id').value = '';
+        document.getElementById('class-modal-title').textContent = 'Add New Class';
+        document.getElementById('delete-class-btn').classList.add('hidden');
+        
+        // Show modal
+        document.getElementById('class-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-class-modal').addEventListener('click', () => {
+        document.getElementById('class-modal').classList.add('hidden');
+    });
+
+    document.getElementById('class-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const classId = document.getElementById('class-id').value || generateId();
+        const className = document.getElementById('className').value;
+        const grade = document.getElementById('grade').value;
+        const subject = document.getElementById('subject').value;
+        const startDate = document.getElementById('startDate').value;
+        
+        const classData = {
+            id: classId,
+            name: className,
+            grade: grade,
+            subject: subject,
+            startDate: startDate
+        };
+        
+        // Check if editing or adding new
+        const existingIndex = appData.classes.findIndex(c => c.id === classId);
+        if (existingIndex >= 0) {
+            appData.classes[existingIndex] = classData;
+        } else {
+            appData.classes.push(classData);
+            // Initialize students array for this class
+            appData.students[classId] = [];
+        }
+        
+        // Save to Firebase
+        await saveClass(classData);
+        
+        // Update UI
+        renderClasses();
+        
+        // Close modal
+        document.getElementById('class-modal').classList.add('hidden');
+        
+        // Add to recent activity
+        addRecentActivity(`${existingIndex >= 0 ? 'Updated' : 'Created'} class: ${className}`);
+    });
+
+    function renderClasses() {
+        const classesList = document.getElementById('classes-list');
+        const noClassesMessage = document.getElementById('no-classes-message');
+        
+        if (appData.classes.length === 0) {
+            noClassesMessage.classList.remove('hidden');
+            classesList.innerHTML = '';
+            return;
+        }
+        
+        noClassesMessage.classList.add('hidden');
+        
+        let html = '';
+        appData.classes.forEach(cls => {
+            const studentCount = appData.students[cls.id] ? appData.students[cls.id].length : 0;
+            
+            html += `
+            <div class="card p-4" data-class-id="${cls.id}">
+                <div class="flex justify-between">
+                    <div>
+                        <h3 class="font-medium">${cls.name}</h3>
+                        <p class="text-sm text-gray-500">${cls.grade} • ${cls.subject}</p>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-sm font-medium">${studentCount} students</span>
+                        <span class="text-xs text-gray-500">Started ${formatDate(cls.startDate)}</span>
+                    </div>
+                </div>
+                <div class="flex mt-3 pt-3 border-t border-gray-100">
+                    <button class="edit-class-btn text-blue-500 text-sm mr-4">
+                        <i class="fas fa-edit mr-1"></i> Edit
+                    </button>
+                    <button class="manage-students-btn text-green-500 text-sm">
+                        <i class="fas fa-users mr-1"></i> Manage Students
+                    </button>
+                </div>
+            </div>
+            `;
+        });
+        
+        classesList.innerHTML = html;
+        
+        // Add event listeners
+        document.querySelectorAll('.edit-class-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const classId = e.target.closest('.card').dataset.classId;
+                editClass(classId);
+            });
+        });
+        
+        document.querySelectorAll('.manage-students-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const classId = e.target.closest('.card').dataset.classId;
+                manageStudents(classId);
+            });
+        });
+    }
+
+    function editClass(classId) {
+        const classData = appData.classes.find(c => c.id === classId);
+        if (!classData) return;
+        
+        document.getElementById('class-id').value = classData.id;
+        document.getElementById('className').value = classData.name;
+        document.getElementById('grade').value = classData.grade;
+        document.getElementById('subject').value = classData.subject;
+        document.getElementById('startDate').value = classData.startDate;
+        
+        document.getElementById('class-modal-title').textContent = 'Edit Class';
+        document.getElementById('delete-class-btn').classList.remove('hidden');
+        
+        document.getElementById('class-modal').classList.remove('hidden');
+    }
+
+    document.getElementById('delete-class-btn').addEventListener('click', async () => {
+        const classId = document.getElementById('class-id').value;
+        if (!classId) return;
+        
+        if (confirm('Are you sure you want to delete this class? This will also delete all students and attendance records for this class.')) {
+            // Find class name for activity log
+            const className = appData.classes.find(c => c.id === classId)?.name || 'Unknown class';
+            
+            // Remove from local data
+            appData.classes = appData.classes.filter(c => c.id !== classId);
+            delete appData.students[classId];
+            
+            // Remove attendance records for this class from local data
+            for (const date in appData.attendance) {
+                if (appData.attendance[date] && appData.attendance[date][classId]) {
+                    delete appData.attendance[date][classId];
+                }
+            }
+            
+            // Delete from Firebase
+            await deleteClass(classId);
+            
+            // Update UI
+            renderClasses();
+            
+            // Close modal
+            document.getElementById('class-modal').classList.add('hidden');
+            
+            // Add to recent activity
+            addRecentActivity(`Deleted class: ${className}`);
+        }
+    });
+
+    // Student Management
+    function manageStudents(classId) {
+        appData.currentClassId = classId;
+        const classData = appData.classes.find(c => c.id === classId);
+        
+        // Update header
+        document.getElementById('class-name-header').textContent = classData.name;
+        document.getElementById('class-details').textContent = `${classData.grade} • ${classData.subject}`;
+        
+        // Render students
+        renderStudents();
+        
+        // Show screen
+        showScreen('students-screen');
+    }
+
+    document.getElementById('back-to-classes').addEventListener('click', () => {
+        showScreen('classes-screen');
+    });
+
+    document.getElementById('add-student-btn').addEventListener('click', () => {
+        // Reset form for new student
+        document.getElementById('student-form').reset();
+        document.getElementById('student-id').value = '';
+        document.getElementById('student-modal-title').textContent = 'Add New Student';
+        document.getElementById('delete-student-btn').classList.add('hidden');
+        
+        // Show modal
+        document.getElementById('student-modal').classList.remove('hidden');
+    });
+
+    document.getElementById('close-student-modal').addEventListener('click', () => {
+        document.getElementById('student-modal').classList.add('hidden');
+    });
+
+    document.getElementById('student-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const studentId = document.getElementById('student-id').value || generateId();
+        const studentName = document.getElementById('studentName').value;
+        const studentIdNumber = document.getElementById('studentId').value;
+        const contactNumber = document.getElementById('contactNumber').value;
+        const guardianName = document.getElementById('guardianName').value;
+        
+        const studentData = {
+            id: studentId,
+            name: studentName,
+            studentId: studentIdNumber,
+            contact: contactNumber,
+            guardian: guardianName
+        };
+        
+        // Ensure students array exists for this class
+        if (!appData.students[appData.currentClassId]) {
+            appData.students[appData.currentClassId] = [];
+        }
+        
+        // Check if editing or adding new
+        const existingIndex = appData.students[appData.currentClassId].findIndex(s => s.id === studentId);
+        if (existingIndex >= 0) {
+            appData.students[appData.currentClassId][existingIndex] = studentData;
+        } else {
+            appData.students[appData.currentClassId].push(studentData);
+        }
+        
+        // Save to Firebase
+        await saveStudent(appData.currentClassId, studentData);
+        
+        // Update UI
+        renderStudents();
+        
+        // Close modal
+        document.getElementById('student-modal').classList.add('hidden');
+        
+        // Add to recent activity
+        const className = appData.classes.find(c => c.id === appData.currentClassId)?.name || 'Unknown class';
+        addRecentActivity(`${existingIndex >= 0 ? 'Updated' : 'Added'} student: ${studentName} to ${className}`);
+    });
+
+    function renderStudents() {
+        // Check if we're on the students screen
+        const studentsScreen = document.getElementById('students-screen');
+        if (!studentsScreen || !studentsScreen.classList.contains('active')) {
+            return; // Don't render if not on students screen
+        }
+        
+        const studentsList = document.getElementById('students-list');
+        const noStudentsMessage = document.getElementById('no-students-message');
+        
+        // Add safety checks for null elements
+        if (!studentsList) {
+            console.error('students-list element not found');
+            return;
+        }
+        
+        if (!noStudentsMessage) {
+            console.error('no-students-message element not found');
+            return;
+        }
+        
+        if (!appData.students[appData.currentClassId] || appData.students[appData.currentClassId].length === 0) {
+            noStudentsMessage.classList.remove('hidden');
+            studentsList.innerHTML = '';
+            return;
+        }
+        
+        noStudentsMessage.classList.add('hidden');
+        
+        let html = '';
+        appData.students[appData.currentClassId].forEach(student => {
+            html += `
+            <div class="card p-4" data-student-id="${student.id}">
+                <div class="flex justify-between">
+                    <div>
+                        <h3 class="font-medium">${student.name}</h3>
+                        <p class="text-sm text-gray-500">ID: ${student.studentId}</p>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-sm">${student.contact}</span>
+                        ${student.guardian ? `<span class="text-xs text-gray-500">Guardian: ${student.guardian}</span>` : ''}
+                    </div>
+                </div>
+                <div class="flex mt-3 pt-3 border-t border-gray-100">
+                    <button class="edit-student-btn text-blue-500 text-sm">
+                        <i class="fas fa-edit mr-1"></i> Edit
+                    </button>
+                </div>
+            </div>
+            `;
+        });
+        
+        studentsList.innerHTML = html;
+        
+        // Add event listeners
+        document.querySelectorAll('.edit-student-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const studentId = e.target.closest('.card').dataset.studentId;
+                editStudent(studentId);
+            });
+        });
+    }
+
+    function editStudent(studentId) {
+        const studentData = appData.students[appData.currentClassId].find(s => s.id === studentId);
+        if (!studentData) return;
+        
+        document.getElementById('student-id').value = studentData.id;
+        document.getElementById('studentName').value = studentData.name;
+        document.getElementById('studentId').value = studentData.studentId;
+        document.getElementById('contactNumber').value = studentData.contact;
+        document.getElementById('guardianName').value = studentData.guardian || '';
+        
+        document.getElementById('student-modal-title').textContent = 'Edit Student';
+        document.getElementById('delete-student-btn').classList.remove('hidden');
+        
+        document.getElementById('student-modal').classList.remove('hidden');
+    }
+
+    document.getElementById('delete-student-btn').addEventListener('click', async () => {
+        const studentId = document.getElementById('student-id').value;
+        if (!studentId) return;
+        
+        if (confirm('Are you sure you want to delete this student? This will also delete all attendance records for this student.')) {
+            // Find student name for activity log
+            const studentName = appData.students[appData.currentClassId].find(s => s.id === studentId)?.name || 'Unknown student';
+            
+            // Remove from local data
+            appData.students[appData.currentClassId] = appData.students[appData.currentClassId].filter(s => s.id !== studentId);
+            
+            // Remove attendance records for this student from local data
+            for (const date in appData.attendance) {
+                if (appData.attendance[date] && appData.attendance[date][appData.currentClassId]) {
+                    appData.attendance[date][appData.currentClassId] = appData.attendance[date][appData.currentClassId].filter(r => r.studentId !== studentId);
+                }
+            }
+            
+            // Delete from Firebase
+            await deleteStudent(appData.currentClassId, studentId);
+            
+            // Update UI
+            renderStudents();
+            
+            // Close modal
+            document.getElementById('student-modal').classList.add('hidden');
+            
+            // Add to recent activity
+            const className = appData.classes.find(c => c.id === appData.currentClassId)?.name || 'Unknown class';
+            addRecentActivity(`Deleted student: ${studentName} from ${className}`);
+        }
+    });
+
+    // Attendance Marking
+    function populateClassDropdowns() {
+        const attendanceClassSelect = document.getElementById('attendance-class');
+        const summaryClassSelect = document.getElementById('summary-class');
+        const exportClassSelect = document.getElementById('export-class');
+        
+        // Clear existing options except the first one
+        attendanceClassSelect.innerHTML = '<option value="">Select a class</option>';
+        summaryClassSelect.innerHTML = '<option value="">Select a class</option>';
+        exportClassSelect.innerHTML = '<option value="">Select a class</option>';
+        
+        // Add class options
+        appData.classes.forEach(cls => {
+            const option = `<option value="${cls.id}">${cls.name} (${cls.grade})</option>`;
+            attendanceClassSelect.insertAdjacentHTML('beforeend', option);
+            summaryClassSelect.insertAdjacentHTML('beforeend', option);
+            exportClassSelect.insertAdjacentHTML('beforeend', option);
+        });
+    }
+
+    document.getElementById('attendance-class').addEventListener('change', () => {
+        const classId = document.getElementById('attendance-class').value;
+        const date = document.getElementById('attendance-date').value;
+        
+        if (classId) {
+            renderAttendanceList(classId, date);
+        } else {
+            document.getElementById('attendance-controls').classList.add('hidden');
+            document.getElementById('attendance-list').innerHTML = '<p class="text-gray-500 text-center py-4">Select a class to mark attendance</p>';
+        }
+    });
+
+    document.getElementById('attendance-date').addEventListener('change', () => {
+        const classId = document.getElementById('attendance-class').value;
+        const date = document.getElementById('attendance-date').value;
+        
+        if (classId) {
+            renderAttendanceList(classId, date);
+        }
+    });
+
+    function renderAttendanceList(classId, date) {
+        if (!appData.students[classId] || appData.students[classId].length === 0) {
+            document.getElementById('attendance-controls').classList.add('hidden');
+            document.getElementById('attendance-list').innerHTML = '<p class="text-gray-500 text-center py-4">No students in this class</p>';
+            return;
+        }
+        
+        document.getElementById('attendance-controls').classList.remove('hidden');
+        
+        // Get existing attendance records for this date and class
+        if (!appData.attendance[date]) {
+            appData.attendance[date] = {};
+        }
+        
+        if (!appData.attendance[date][classId]) {
+            appData.attendance[date][classId] = [];
+        }
+        
+        let html = '';
+        appData.students[classId].forEach(student => {
+            // Find existing record for this student
+            const record = appData.attendance[date][classId].find(r => r.studentId === student.id);
+            const status = record ? record.status : '';
+            
+            html += `
+            <div class="card p-4 mb-4" data-student-id="${student.id}">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-medium">${student.name}</h3>
+                        <p class="text-xs text-gray-500">ID: ${student.studentId}</p>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1">
+                        <div class="attendance-option">
+                            <input type="radio" name="attendance-${student.id}" id="present-${student.id}" value="present" ${status === 'present' ? 'checked' : ''}>
+                            <label for="present-${student.id}" class="present">Present</label>
+                        </div>
+                        <div class="attendance-option">
+                            <input type="radio" name="attendance-${student.id}" id="absent-${student.id}" value="absent" ${status === 'absent' ? 'checked' : ''}>
+                            <label for="absent-${student.id}" class="absent">Absent</label>
+                        </div>
+                        <div class="attendance-option">
+                            <input type="radio" name="attendance-${student.id}" id="late-${student.id}" value="late" ${status === 'late' ? 'checked' : ''}>
+                            <label for="late-${student.id}" class="late">Late</label>
+                        </div>
+                        <div class="attendance-option">
+                            <input type="radio" name="attendance-${student.id}" id="excused-${student.id}" value="excused" ${status === 'excused' ? 'checked' : ''}>
+                            <label for="excused-${student.id}" class="excused">Excused</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+        
+        document.getElementById('attendance-list').innerHTML = html;
+        
+        // Add event listeners for radio buttons
+        document.querySelectorAll('.attendance-option input[type="radio"]').forEach(radio => {
+            radio.addEventListener('change', async (e) => {
+                const studentId = e.target.closest('.card').dataset.studentId;
+                const status = e.target.value;
+                
+                // Update attendance record in local data
+                const existingIndex = appData.attendance[date][classId].findIndex(r => r.studentId === studentId);
+                if (existingIndex >= 0) {
+                    appData.attendance[date][classId][existingIndex].status = status;
+                } else {
+                    appData.attendance[date][classId].push({
+                        studentId: studentId,
+                        status: status
+                    });
+                }
+                
+                // Save to Firebase
+                await saveAttendance(date, classId, appData.attendance[date][classId]);
+                
+                // Add to recent activity
+                const studentName = appData.students[classId].find(s => s.id === studentId)?.name || 'Unknown student';
+                const className = appData.classes.find(c => c.id === classId)?.name || 'Unknown class';
+                addRecentActivity(`Marked ${studentName} as ${status} in ${className}`);
+            });
+        });
+    }
+
+    document.getElementById('mark-all-present').addEventListener('click', async () => {
+        const classId = document.getElementById('attendance-class').value;
+        const date = document.getElementById('attendance-date').value;
+        
+        if (!classId || !date) return;
+        
+        // Mark all students as present
+        document.querySelectorAll('.card[data-student-id]').forEach(card => {
+            const studentId = card.dataset.studentId;
+            const presentRadio = document.getElementById(`present-${studentId}`);
+            if (presentRadio) {
+                presentRadio.checked = true;
+                
+                // Update attendance record in local data
+                const existingIndex = appData.attendance[date][classId].findIndex(r => r.studentId === studentId);
+                if (existingIndex >= 0) {
+                    appData.attendance[date][classId][existingIndex].status = 'present';
+                } else {
+                    appData.attendance[date][classId].push({
+                        studentId: studentId,
+                        status: 'present'
+                    });
+                }
+            }
+        });
+        
+        // Save to Firebase
+        await saveAttendance(date, classId, appData.attendance[date][classId]);
+        
+        // Add to recent activity
+        const className = appData.classes.find(c => c.id === classId)?.name || 'Unknown class';
+        addRecentActivity(`Marked all students present in ${className}`);
+    });
+
+    // Summary Screen
+    document.getElementById('summary-class').addEventListener('change', () => {
+        const classId = document.getElementById('summary-class').value;
+        
+        if (classId) {
+            // Populate student dropdown
+            populateStudentDropdown(classId, 'summary-student');
+            
+            // Show summary
+            updateSummary();
+        } else {
+            document.getElementById('summary-student').innerHTML = '<option value="">All Students</option>';
+            document.getElementById('summary-stats').classList.add('hidden');
+            document.getElementById('calendar-view').classList.add('hidden');
+            document.getElementById('student-summary-list').innerHTML = '<p class="text-gray-500 text-center py-4" id="no-summary-message">Select a class to view summary</p>';
+        }
+    });
+
+    document.getElementById('summary-student').addEventListener('change', updateSummary);
+    document.getElementById('summary-start-date').addEventListener('change', updateSummary);
+    document.getElementById('summary-end-date').addEventListener('change', updateSummary);
+
+    function populateStudentDropdown(classId, elementId) {
+        const studentSelect = document.getElementById(elementId);
+        
+        // Clear existing options except the first one
+        studentSelect.innerHTML = '<option value="">All Students</option>';
+        
+        // Add student options
+        if (appData.students[classId]) {
+            appData.students[classId].forEach(student => {
+                const option = `<option value="${student.id}">${student.name}</option>`;
+                studentSelect.insertAdjacentHTML('beforeend', option);
+            });
+        }
+    }
+
+    function updateSummary() {
+        const classId = document.getElementById('summary-class').value;
+        const studentId = document.getElementById('summary-student').value;
+        const startDate = document.getElementById('summary-start-date').value;
+        const endDate = document.getElementById('summary-end-date').value;
+        
+        if (!classId) return;
+        
+        // Calculate attendance statistics
+        const stats = calculateAttendanceStats(classId, studentId, startDate, endDate);
+        
+        // Update stats display
+        document.getElementById('present-count').textContent = stats.present;
+        document.getElementById('absent-count').textContent = stats.absent;
+        document.getElementById('late-count').textContent = stats.late;
+        document.getElementById('excused-count').textContent = stats.excused;
+        
+        document.getElementById('summary-stats').classList.remove('hidden');
+        
+        // Update calendar view
+        updateCalendarView(classId, studentId, startDate, endDate);
+        
+        // Update student summary list
+        updateStudentSummaryList(classId, startDate, endDate);
+    }
+
+    function calculateAttendanceStats(classId, studentId, startDate, endDate) {
+        let present = 0;
+        let absent = 0;
+        let late = 0;
+        let excused = 0;
+        
+        // Loop through all dates in the range
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const dateStr = d.toISOString().split('T')[0];
+            
+            if (appData.attendance[dateStr] && appData.attendance[dateStr][classId]) {
+                const records = appData.attendance[dateStr][classId];
+                
+                if (studentId) {
+                    // Count for specific student
+                    const record = records.find(r => r.studentId === studentId);
+                    if (record) {
+                        if (record.status === 'present') present++;
+                        else if (record.status === 'absent') absent++;
+                        else if (record.status === 'late') late++;
+                        else if (record.status === 'excused') excused++;
+                    }
+                } else {
+                    // Count for all students
+                    records.forEach(record => {
+                        if (record.status === 'present') present++;
+                        else if (record.status === 'absent') absent++;
+                        else if (record.status === 'late') late++;
+                        else if (record.status === 'excused') excused++;
+                    });
+                }
+            }
+        }
+        
+        return { present, absent, late, excused };
+    }
+
+    function updateCalendarView(classId, studentId, startDate, endDate) {
+        const calendarMonth = document.getElementById('calendar-month');
+        const calendar = document.querySelector('.calendar');
+        
+        // Set month display
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const currentDate = new Date(startDate);
+        calendarMonth.textContent = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+        
+        // Clear existing calendar days (except header)
+        const headerItems = Array.from(calendar.querySelectorAll('.text-xs'));
+        calendar.innerHTML = '';
+        headerItems.forEach(item => calendar.appendChild(item));
+        
+        // Get first day of month and number of days
+        const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+        const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+        
+        // Add empty cells for days before first day of month
+        for (let i = 0; i < firstDay; i++) {
+            const emptyDay = document.createElement('div');
+            calendar.appendChild(emptyDay);
+        }
+        
+        // Add days of month
+        for (let day = 1; day <= lastDay; day++) {
+            const dayDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+            const dateStr = dayDate.toISOString().split('T')[0];
+            
+            const dayElement = document.createElement('div');
+            dayElement.className = 'calendar-day';
+            dayElement.textContent = day;
+            
+            // Check if this day has attendance records
+            if (appData.attendance[dateStr] && appData.attendance[dateStr][classId]) {
+                const records = appData.attendance[dateStr][classId];
+                
+                if (studentId) {
+                    // Show status for specific student
+                    const record = records.find(r => r.studentId === studentId);
+                    if (record) {
+                        dayElement.classList.add(record.status);
+                    }
+                } else {
+                    // Show most common status for all students
+                    const statuses = records.map(r => r.status);
+                    const statusCounts = {};
+                    statuses.forEach(status => {
+                        statusCounts[status] = (statusCounts[status] || 0) + 1;
+                    });
+                    
+                    let maxCount = 0;
+                    let maxStatus = '';
+                    for (const status in statusCounts) {
+                        if (statusCounts[status] > maxCount) {
+                            maxCount = statusCounts[status];
+                            maxStatus = status;
+                        }
+                    }
+                    
+                    if (maxStatus) {
+                        dayElement.classList.add(maxStatus);
+                    }
+                }
+            }
+            
+            calendar.appendChild(dayElement);
+        }
+        
+        document.getElementById('calendar-view').classList.remove('hidden');
+    }
+
+    function updateStudentSummaryList(classId, startDate, endDate) {
+        const summaryList = document.getElementById('student-summary-list');
+        
+        if (!appData.students[classId] || appData.students[classId].length === 0) {
+            summaryList.innerHTML = '<p class="text-gray-500 text-center py-4">No students in this class</p>';
+            return;
+        }
+        
+        let html = '';
+        appData.students[classId].forEach(student => {
+            // Calculate attendance for this student
+            const stats = calculateAttendanceStats(classId, student.id, startDate, endDate);
+            const total = stats.present + stats.absent + stats.late + stats.excused;
+            const percentage = total > 0 ? Math.round((stats.present / total) * 100) : 0;
+            
+            html += `
+            <div class="card p-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-medium">${student.name}</h3>
+                        <p class="text-xs text-gray-500">ID: ${student.studentId}</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-lg font-bold ${percentage >= 75 ? 'text-green-500' : percentage >= 50 ? 'text-yellow-500' : 'text-red-500'}">${percentage}%</div>
+                        <p class="text-xs text-gray-500">Attendance</p>
+                    </div>
+                </div>
+                <div class="mt-3 grid grid-cols-4 gap-2 text-center text-xs">
+                    <div class="bg-green-50 p-2 rounded">
+                        <div class="font-medium">${stats.present}</div>
+                        <div class="text-gray-500">Present</div>
+                    </div>
+                    <div class="bg-red-50 p-2 rounded">
+                        <div class="font-medium">${stats.absent}</div>
+                        <div class="text-gray-500">Absent</div>
+                    </div>
+                    <div class="bg-yellow-50 p-2 rounded">
+                        <div class="font-medium">${stats.late}</div>
+                        <div class="text-gray-500">Late</div>
+                    </div>
+                    <div class="bg-indigo-50 p-2 rounded">
+                        <div class="font-medium">${stats.excused}</div>
+                        <div class="text-gray-500">Excused</div>
+                    </div>
+                </div>
+            </div>
+            `;
+        });
+        
+        summaryList.innerHTML = html;
+    }
+
+    // Export Screen
+    document.getElementById('export-class').addEventListener('change', () => {
+        const classId = document.getElementById('export-class').value;
+        
+        if (classId) {
+            // Populate student dropdown
+            populateStudentDropdown(classId, 'export-student');
+        } else {
+            document.getElementById('export-student').innerHTML = '<option value="">All Students</option>';
+        }
+    });
+
+    document.getElementById('export-btn').addEventListener('click', async () => {
+        const classId = document.getElementById('export-class').value;
+        const studentId = document.getElementById('export-student').value;
+        const startDate = document.getElementById('export-start-date').value;
+        const endDate = document.getElementById('export-end-date').value;
+        const format = document.querySelector('input[name="export-format"]:checked').value;
+        
+        if (!classId) {
+            alert('Please select a class');
+            return;
+        }
+        
+        if (!startDate || !endDate) {
+            alert('Please select date range');
+            return;
+        }
+        
+        // Generate export data
+        const exportData = generateExportData(classId, studentId, startDate, endDate);
+        
+        // Create export record
+        const className = appData.classes.find(c => c.id === classId)?.name || 'Unknown class';
+        const studentName = studentId ? appData.students[classId].find(s => s.id === studentId)?.name : 'All Students';
+        
+        const exportRecord = {
+            id: generateId(),
+            date: new Date().toISOString(),
+            className: className,
+            studentName: studentName,
+            dateRange: `${formatDate(startDate)} - ${formatDate(endDate)}`,
+            format: format
+        };
+        
+        // Add to local data
+        appData.exports.unshift(exportRecord);
+        
+        // Keep only last 10 exports
+        if (appData.exports.length > 10) {
+            appData.exports = appData.exports.slice(0, 10);
+        }
+        
+        // Save to Firebase
+        await saveExport(exportRecord);
+        
+        // Update UI
+        renderExports();
+        
+        // Add to recent activity
+        addRecentActivity(`Exported ${className} attendance data as ${format.toUpperCase()}`);
+        
+        // In a real app, this would trigger a download
+        // For this demo, we'll just show an alert
+        alert(`Export successful! ${format.toUpperCase()} file would download now.`);
+    });
+
+    function generateExportData(classId, studentId, startDate, endDate) {
+        // This function would generate the actual export data
+        // For this demo, we'll just return a placeholder
+        return {
+            classId,
+            studentId,
+            startDate,
+            endDate,
+            data: 'Sample export data'
+        };
+    }
+
+    function renderExports() {
+        const exportsList = document.getElementById('exports-list');
+        const noExportsMessage = document.getElementById('no-exports-message');
+        
+        if (appData.exports.length === 0) {
+            noExportsMessage.classList.remove('hidden');
+            exportsList.innerHTML = '';
+            return;
+        }
+        
+        noExportsMessage.classList.add('hidden');
+        
+        let html = '';
+        appData.exports.forEach(exp => {
+            html += `
+            <div class="flex justify-between items-center py-2 border-b border-gray-100">
+                <div>
+                    <p class="font-medium text-sm">${exp.className} - ${exp.studentName}</p>
+                    <p class="text-xs text-gray-500">${exp.dateRange}</p>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-xs bg-gray-100 px-2 py-1 rounded mr-2">${exp.format.toUpperCase()}</span>
+                    <button class="text-blue-500">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+            `;
+        });
+        
+        exportsList.innerHTML = html;
+    }
+
+    // Recent Activity
+    function addRecentActivity(activity) {
+        const recentActivity = document.getElementById('recent-activity');
+        
+        // Safety check for null element
+        if (!recentActivity) {
+            console.error('recent-activity element not found');
+            return;
+        }
+        
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Remove "No recent activity" message if present
+        const noActivityMsg = recentActivity.querySelector('p.text-center');
+        if (noActivityMsg) {
+            recentActivity.innerHTML = '';
+        }
+        
+        // Add new activity at the top
+        const activityItem = document.createElement('div');
+        activityItem.className = 'flex justify-between items-center py-2 border-b border-gray-100';
+        activityItem.innerHTML = `
+            <p class="text-sm">${activity}</p>
+            <p class="text-xs text-gray-500">${timeStr}</p>
+        `;
+        
+        recentActivity.insertBefore(activityItem, recentActivity.firstChild);
+        
+        // Keep only last 5 activities
+        const activities = recentActivity.querySelectorAll('.flex');
+        if (activities.length > 5) {
+            recentActivity.removeChild(activities[activities.length - 1]);
+        }
+    }
+
+    // Load data from Firebase
+    async function loadData() {
+        try {
+            // Load teacher data
+            const teacher = await loadTeacher();
+            if (teacher) {
+                appData.teacher = teacher;
+                document.getElementById('teacher-name').textContent = `Welcome, ${appData.teacher.name}`;
+                showScreen('dashboard-screen');
+            }
+            
+            // Load classes
+            const classes = await loadClasses();
+            if (classes && classes.length > 0) {
+                appData.classes = classes;
+                renderClasses();
+            }
+            
+            // Load students for all classes
+            if (appData.classes && appData.classes.length > 0) {
+                for (const classData of appData.classes) {
+                    const students = await loadStudentsForClass(classData.id);
+                    if (students && students.length > 0) {
+                        appData.students[classData.id] = students;
+                    }
+                }
+            }
+            
+            // Load attendance data
+            const attendance = await loadAllAttendance();
+            if (attendance) {
+                appData.attendance = attendance;
+            }
+            
+            // Load exports
+            const exports = await loadExports();
+            if (exports && exports.length > 0) {
+                appData.exports = exports;
+                renderExports();
+            }
+            
+        } catch (error) {
+            console.error('Error loading data from Firebase:', error);
+            // Fallback to show welcome screen if no teacher data found
+            if (!appData.teacher) {
+                showScreen('welcome-screen');
+            }
+        }
+    }
+
+    // Initialize app
+    loadData();
+    
+    // Show slide-up elements with delay
+    setTimeout(() => {
+        document.querySelectorAll('.slide-up').forEach((el, index) => {
+            setTimeout(() => {
+                el.classList.add('show');
+            }, index * 100);
+        });
+    }, 300);
+    </script>
+</body>
+</html>
